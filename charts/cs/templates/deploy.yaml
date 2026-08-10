@@ -92,6 +92,10 @@ spec:
           subPath: cvmedia
         {{- include "cv.additionalVolumeMounts" . }}
         {{ include "cv.commonContainerSpecs" . }}
+        # Nothing is rendered when .Values.sidecars is not defined.
+        {{- with .Values.sidecars }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
 
       volumes:
       {{- include "cv.commonVolumes" . }}
