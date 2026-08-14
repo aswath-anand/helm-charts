@@ -84,13 +84,26 @@ spec:
         {{- include "cv.additionalVolumeMounts" . }}
         {{ include "cv.commonContainerSpecs" . }}
 
+      # ------------------------------------------------------------
+      # Optional sidecars
+      # Fluent Bit is supplied through .Values.sidecars
+      # ------------------------------------------------------------
+      {{- with .Values.sidecars }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+
       volumes:
       {{- include "cv.commonVolumes" . }}
       {{- if not $statefulset }}
       {{- include "cv.deployment.volumes" (list . "certsandlogs" "10Gi") }}
       {{- include "cv.deployment.additionalVolumes" . }}
       {{- end }}
-
+      
+      # Generic additional Kubernetes volumes used by sidecars.
+      # Examples: CSI, ConfigMap, Secret, emptyDir.
+      {{- with .Values.additionalVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
   {{- if $statefulset }}
   volumeClaimTemplates:
   {{- include "cv.statefulset.pvctemplate" (list . "certsandlogs" "10Gi") }}
