@@ -1,9 +1,10 @@
+---
 {{- if ne .Values.create false -}}
 {{- include "cv.utils.validateVersionAndRelease" . }}
 {{- $objectname := include "cv.metadataname" . }}
 {{- $statefulset := or .Values.statefulset ((.Values).global).statefulset }}
 
-apiVersion: apps/v1 
+apiVersion: apps/v1
 kind: {{ if $statefulset }}StatefulSet{{ else }}Deployment{{ end }}
 metadata:
   name: {{ $objectname }}
@@ -15,8 +16,10 @@ metadata:
     {{- end }}
   labels:
     app.kubernetes.io/name: {{ $objectname }}
+
 spec:
   {{- include "cv.commondeploymentspecs" . }}
+
   template:
     metadata:
       name: {{ $objectname }}
@@ -25,9 +28,11 @@ spec:
       labels:
         app.kubernetes.io/name: {{ $objectname }}
         app.kubernetes.io/component: commserve
+
     spec:
       {{- include "cv.imagePullSecret" . }}
       {{- include "cv.additionalPodspecs" . }}
+
       {{- if eq (or .Values.nodeAffinityMode ((.Values).global).nodeAffinityMode | int) 1 }}
       affinity:
         podAntiAffinity:
@@ -43,68 +48,97 @@ spec:
                       values:
                         - commserve
       {{- end }}
+
       {{- include "cv.initContainer" . }}
+
       containers:
-      # Commserve
+
+      # ------------------------------------------------------------
+      # CommServe
+      # ------------------------------------------------------------
       - name: {{ $objectname }}
         image: {{ include "cv.image" . }}
+
         {{- include "cv.resources" . }}
         {{- include "cv.additionalContainerspecs" . }}
+
         envFrom:
-        {{- if eq (include "cv.useInitContainer" .) "false" }}        
+        {{- if eq (include "cv.useInitContainer" .) "false" }}
         - secretRef:
-           name: {{ include "cv.metadataname2" (list . "cvcreds") }}
-           optional: true
+            name: {{ include "cv.metadataname2" (list . "cvcreds") }}
+            optional: true
         {{- end }}
+
         env:
         {{- include "cv.commonenv" . }}
+
         {{- if .Values.email }}
         - name: CVID_EMAIL
-          # Optional. Email of admin user
           value: {{ .Values.email }}
         {{- end }}
-        # Ports can be left as mentioned as commserver needs all of them for correct functioning.   
+
         ports:
-        - containerPort: 5000        
+        - containerPort: 5000
         - containerPort: 80
         - containerPort: {{ include "cv.cvfwdport" . }}
         - containerPort: 8400
         - containerPort: 8401
         - containerPort: 1433
         - containerPort: 27017
-        - containerPort: 8052        
+        - containerPort: 8052
         - containerPort: 5008
+
         volumeMounts:
-        # This section contains list of persistent volumes that has to be mounted onto the container.                 
-        # This can be left with default settings as mentioned in this template.
         {{- include "cv.commonVolumeMounts" . }}
+
         - name: cv-storage-csdb
           mountPath: {{ include "cv.paths.commvaultDB" . }}
-          subPath: {{include "cv.utils.getOemPath" .}}DB
+          subPath: {{ include "cv.utils.getOemPath" . }}DB
+
         - name: cv-storage-drbackups
           mountPath: {{ include "cv.paths.commvaultDR" . }}
           subPath: drbackups
+
         - name: cv-storage-csdb
           mountPath: /var/opt/mssql
           subPath: mssql
+
         - name: cv-storage-cvmedia
           mountPath: {{ include "cv.paths.sw" . }}
           subPath: cvmedia
-        {{- include "cv.additionalVolumeMounts" . }}
-        {{ include "cv.commonContainerSpecs" . }}
-        # Nothing is rendered when .Values.sidecars is not defined.
-        {{- with .Values.sidecars }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
 
+        {{- include "cv.additionalVolumeMounts" . }}
+
+        {{ include "cv.commonContainerSpecs" . }}
+
+      # ------------------------------------------------------------
+      # Optional sidecars
+      # Fluent Bit is supplied through .Values.sidecars
+      # ------------------------------------------------------------
+      {{- with .Values.sidecars }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+
+      # ------------------------------------------------------------
+      # Volumes
+      # ------------------------------------------------------------
       volumes:
       {{- include "cv.commonVolumes" . }}
+
       {{- if not $statefulset }}
       {{- include "cv.deployment.volumes" (list . "certsandlogs" "50Gi") }}
       {{- include "cv.deployment.volumes" (list . "csdb" "100Gi") }}
       {{- include "cv.deployment.volumes" (list . "drbackups" "50Gi") }}
       {{- include "cv.deployment.volumes" (list . "cvmedia" "100Gi") }}
+
+      # Existing additional PVC volumes
       {{- include "cv.deployment.additionalVolumes" . }}
+      {{- end }}
+
+      # Generic additional Kubernetes volumes used by sidecars.
+      # Examples: CSI, ConfigMap, Secret, emptyDir.
+      {{- with .Values.additionalVolumes }}
+      {{- toYaml . | nindent 6 }}
       {{- end }}
 
   {{- if $statefulset }}
@@ -114,8 +148,11 @@ spec:
   {{- include "cv.statefulset.pvctemplate" (list . "drbackups" "50Gi") }}
   {{- include "cv.statefulset.pvctemplate" (list . "cvmedia" "100Gi") }}
   {{- include "cv.statefulset.additionalPvcTemplates" . }}
+
   persistentVolumeClaimRetentionPolicy:
     whenScaled: {{ or .Values.whenScaled .Values.global.whenScaled | default "Delete" }}
     whenDeleted: {{ or .Values.whenDeleted .Values.global.whenDeleted | default "Delete" }}
   {{- end }}
+
 {{- end }}
+---
